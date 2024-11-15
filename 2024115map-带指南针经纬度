@@ -1,0 +1,115 @@
+# 加载所需的库
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(sf)
+library(raster)
+library(ggspatial)
+library(showtext)
+
+# 添加字体支持
+showtext_auto()
+
+# 使用tryCatch来处理文件读取
+tryCatch({
+    # 读取数据
+    all_data <- read_csv("/wrk/luolin/work/NE2_50M_SR/map_distribution.csv")
+    gbif_data <- read_csv("/wrk/luolin/work/NE2_50M_SR/gbif_final_cleaned_global.csv")
+    
+    # 处理第一个数据源
+    americanus_data <- all_data %>%
+        dplyr::filter(Species == "Cenchrus americanus") %>%
+        dplyr::mutate(
+            Latitude = as.numeric(Latitude),
+            Longitude = as.numeric(Longitude)
+        ) %>%
+        na.omit()
+    
+    # 处理GBIF数据
+    gbif_points <- as.data.frame(gbif_data) %>%
+        dplyr::select(decimalLatitude, decimalLongitude) %>%
+        na.omit()
+    
+    # 转换为空间格式
+    americanus_sf <- st_as_sf(americanus_data, 
+                             coords = c("Longitude", "Latitude"), 
+                             crs = 4326)
+    gbif_sf <- st_as_sf(gbif_points, 
+                        coords = c("decimalLongitude", "decimalLatitude"), 
+                        crs = 4326)
+    
+    # 加载底图，使用suppressWarnings来处理TIFF警告
+    nat.earth <- suppressWarnings(raster::brick("/wrk/luolin/work/NE2_50M_SR/NE2_50M_SR.tif"))
+    
+    # 创建分布图
+    p <- ggplot() +
+        # 添加底图
+        layer_spatial(nat.earth) +
+        # 添加经纬度
+        scale_x_continuous(breaks = c(-120, 0, 120),
+                         labels = c("120°W", "0°", "120°E")) +
+        scale_y_continuous(breaks = c(-60, 0, 60),
+                         labels = c("60°S", "0°", "60°N")) +
+        theme_bw() +
+        # GBIF点
+        geom_sf(data = gbif_sf,
+                aes(color = "GBIF occurrence records"),
+                size = 1,
+                alpha = 0.3) +
+        # 原始点
+        geom_sf(data = americanus_sf,
+                aes(color = "Characterized germplasm resources\n(evaluation data available)"),
+                size = 1) +
+        # 添加指北针
+        annotation_north_arrow(
+            location = "tl",  # tl表示top left
+            which_north = "true",
+            pad_x = unit(0.5, "cm"),
+            pad_y = unit(0.5, "cm"),
+            style = north_arrow_fancy_orienteering
+        ) +
+        # 设置颜色和图例
+        scale_color_manual(
+            name = NULL,
+            values = c(
+                "Characterized germplasm resources\n(evaluation data available)" = "#FE8E46",
+                "GBIF occurrence records" = "#46ACCA"
+            )
+        ) +
+        # 添加标题
+        labs(title = "Global distribution pattern of pearl millet (Cenchrus americanus) as a potential energy crop") +
+        # 主题设置
+        theme(
+            axis.text = element_text(size = 12, color = "black"),
+            axis.line = element_blank(),
+            panel.background = element_rect(fill = "#f5f6f1"),
+            panel.grid.major = element_line(colour = "gray80", linetype = "dashed"),
+            # 将图例移到底部并居中
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.background = element_rect(fill = "white", 
+                                          color = "black", 
+                                          linewidth = 0.3),
+            legend.margin = margin(6, 6, 6, 6),
+            legend.spacing.x = unit(0.5, 'cm'),
+            legend.box.just = "center",
+            plot.title = element_text(size = 14, 
+                                    face = "bold",
+                                    margin = margin(b = 10)),
+            plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm")
+        ) +
+        # 确保经纬度能显示
+        coord_sf(expand = FALSE)
+    
+    # 使用try()来处理保存过程
+    try({
+        ggsave("Cenchrus_americanus_Distribution_Map_with_GBIF.png",
+               plot = p,
+               width = 10,
+               height = 7,
+               dpi = 300)
+    })
+    
+}, error = function(e) {
+    message("Error occurred: ", e$message)
+})
