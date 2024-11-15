@@ -7,122 +7,101 @@ library(raster)
 library(ggspatial)
 library(showtext)
 
-# 设置字体
+# 添加字体支持
 showtext_auto()
 
-# 文件路径
-data_path <- "/wrk/luolin/work/NE2_50M_SR/map_distribution.csv"
-gbif_data_path <- "/wrk/luolin/work/NE2_50M_SR/gbif_final_cleaned_global.csv"
-base_map_path <- "/wrk/luolin/work/NE2_50M_SR/NE2_50M_SR.tif"
-
-# 读取数据
-all_data <- read_csv(data_path)
-gbif_data <- read_csv(gbif_data_path)
-
-# 处理表型数据
-americanus_data <- all_data %>% 
- filter(Species == "Cenchrus americanus") %>% 
- mutate(
-   Latitude = as.numeric(Latitude),
-   Longitude = as.numeric(Longitude)
- ) %>% 
- na.omit()
-
-# 处理GBIF数据
-gbif_points <- as.data.frame(gbif_data) %>%
- select(decimalLatitude, decimalLongitude) %>%
- na.omit()
-
-# 转换为空间格式
-americanus_sf <- st_as_sf(americanus_data, 
-                        coords = c("Longitude", "Latitude"), 
+# 使用tryCatch来处理文件读取
+tryCatch({
+    # 读取数据
+    all_data <- read_csv("/wrk/luolin/work/NE2_50M_SR/map_distribution.csv")
+    gbif_data <- read_csv("/wrk/luolin/work/NE2_50M_SR/gbif_final_cleaned_global.csv")
+    
+    # 处理第一个数据源
+    americanus_data <- all_data %>%
+        dplyr::filter(Species == "Cenchrus americanus") %>%
+        dplyr::mutate(
+            Latitude = as.numeric(Latitude),
+            Longitude = as.numeric(Longitude)
+        ) %>%
+        na.omit()
+    
+    # 处理GBIF数据
+    gbif_points <- as.data.frame(gbif_data) %>%
+        dplyr::select(decimalLatitude, decimalLongitude) %>%
+        na.omit()
+    
+    # 转换为空间格式
+    americanus_sf <- st_as_sf(americanus_data, 
+                             coords = c("Longitude", "Latitude"), 
+                             crs = 4326)
+    gbif_sf <- st_as_sf(gbif_points, 
+                        coords = c("decimalLongitude", "decimalLatitude"), 
                         crs = 4326)
-gbif_sf <- st_as_sf(gbif_points, 
-                   coords = c("decimalLongitude", "decimalLatitude"), 
-                   crs = 4326)
-
-# 加载底图
-nat.earth <- raster::brick(base_map_path)
-
-# 创建主图
-p <- ggplot() +
- # 底图
- layer_spatial(nat.earth, alpha = 0.8) +
- 
- # GBIF点密度图层
- stat_density_2d(
-   data = gbif_points,
-   aes(x = decimalLongitude, 
-       y = decimalLatitude,
-       fill = ..density..),
-   geom = "tile",
-   contour = FALSE,
-   h = c(5, 5),
-   n = 100,
-   alpha = 0.6
- ) +
- 
- # 表型数据点
- geom_sf(
-   data = americanus_sf,
-   color = "#E25B45",
-   size = 2,
-   alpha = 0.9
- ) +
- 
- # 比例尺和指北针
- annotation_scale(
-   location = "bl",
-   width_hint = 0.5,
-   pad_x = unit(0.5, "cm"),
-   pad_y = unit(0.5, "cm")
- ) +
- annotation_north_arrow(
-   location = "tr",
-   style = north_arrow_fancy_orienteering,
-   pad_x = unit(0.5, "cm"),
-   pad_y = unit(0.5, "cm")
- ) +
- 
- # 标题和标签
- labs(
-   title = "Global Distribution of Pearl Millet (Cenchrus americanus)",
-   subtitle = "Demonstrating worldwide cultivation potential",
-   caption = paste0(
-     "Red points: Phenotype data (n=", nrow(americanus_data), ")\n",
-     "Density: GBIF records (n=", nrow(gbif_points), ")"
-   ),
-   x = NULL,
-   y = NULL
- ) +
- 
- # 限制纬度范围
- coord_sf(ylim = c(-50, 70)) +
- 
- # 主题设置
- theme_minimal() +
- theme(
-   plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-   plot.subtitle = element_text(size = 12, hjust = 0.5, color = "darkgrey"),
-   plot.caption = element_text(size = 10, hjust = 0),
-   axis.text = element_text(size = 10, color = "grey50"),
-   panel.background = element_rect(fill = "white"),
-   panel.grid = element_blank(),
-   legend.position = "none"
- ) +
- 
- # 颜色渐变
- scale_fill_gradientn(
-   colors = c("#3A0F50CC", "#7B1E71CC", "#CB4678CC", "#F8765CCC"),
-   na.value = "transparent"
- )
-
-# 保存图片
-ggsave(
- "Pearl_Millet_Global_Distribution.png",
- plot = p,
- width = 15,
- height = 8,
- dpi = 300,
- bg = "white"
-)
+    
+    # 加载底图，使用suppressWarnings来处理TIFF警告
+    nat.earth <- suppressWarnings(raster::brick("/wrk/luolin/work/NE2_50M_SR/NE2_50M_SR.tif"))
+    
+    # 创建分布图
+    p <- ggplot() +
+        # 添加底图
+        layer_spatial(nat.earth) +
+        theme_bw() +
+        # GBIF点
+        geom_sf(data = gbif_sf,
+                aes(color = "GBIF occurrence records"),
+                size = 1,
+                alpha = 0.3) +
+        # 原始点
+        geom_sf(data = americanus_sf,
+                aes(color = "Characterized germplasm resources\n(evaluation data available)"),
+                size = 1) +
+        # 添加指北针 - 修改为左上角
+        annotation_north_arrow(
+            location = "tl",  # tl表示top left
+            which_north = "true",
+            pad_x = unit(0.5, "cm"),
+            pad_y = unit(0.5, "cm"),
+            style = north_arrow_fancy_orienteering
+        ) +
+        # 设置颜色和图例
+        scale_color_manual(
+            name = NULL,
+            values = c(
+                "Characterized germplasm resources\n(evaluation data available)" = "#FE8E46",
+                "GBIF occurrence records" = "#46ACCA"
+            )
+        ) +
+        # 添加标题
+        labs(title = "Global distribution pattern of pearl millet (Cenchrus americanus) as a potential energy crop") +
+        # 主题设置
+        theme(
+            axis.text = element_text(size = 12, color = "black"),
+            axis.line = element_blank(),
+            panel.background = element_rect(fill = "#f5f6f1"),
+            # 将图例移到底部并居中
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.background = element_rect(fill = "white", 
+                                          color = "black", 
+                                          linewidth = 0.3),
+            legend.margin = margin(6, 6, 6, 6),
+            legend.spacing.x = unit(0.5, 'cm'),  # 图例项之间的水平间距
+            legend.box.just = "center",  # 图例框居中
+            plot.title = element_text(size = 14, 
+                                    face = "bold",
+                                    margin = margin(b = 10)),
+            plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm")
+        )
+    
+    # 使用try()来处理保存过程
+    try({
+        ggsave("Cenchrus_americanus_Distribution_Map_with_GBIF.png",
+               plot = p,
+               width = 10,
+               height = 7,
+               dpi = 300)
+    })
+    
+}, error = function(e) {
+    message("Error occurred: ", e$message)
+})
