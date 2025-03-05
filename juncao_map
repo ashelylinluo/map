@@ -29,26 +29,27 @@ p <- ggplot() +
   # 添加栅格底图
   annotation_spatial(data = r) +
   
-  # 添加连接线
+  # 添加连接线 (浅绿色)
   geom_curve(data = map_data, 
              aes(x = 119.2965, y = 26.0742, xend = Longitude, yend = Latitude),
              curvature = 0.2, 
-             arrow = arrow(length = unit(0.15, "inches")), 
-             color = "blue", 
-             size = 0.5, 
-             alpha = 0.6) +
+             arrow = arrow(length = unit(0.1, "inches")),  # **箭头变小**
+             color = "#90EE90",   # **换成浅绿色**
+             size = 0.6, 
+             alpha = 0.7) +
   
-  # 添加目标点
+  # 添加目标点 (红色)
   geom_point(data = map_data, 
              aes(x = Longitude, y = Latitude), 
              color = "red", 
              size = 1.5) +
   
-  # 添加福州起点
+  # **福州点换成小五角星**
   geom_point(data = fuzhou, 
              aes(x = lon, y = lat), 
-             color = "green", 
-             size = 2) +
+             color = "red",   # **五角星颜色**
+             shape = 8,        # **五角星**
+             size = 3) +       # **适中大小**
   
   # 添加国家标签
   geom_text(data = map_data, 
