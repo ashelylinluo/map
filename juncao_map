@@ -1,0 +1,81 @@
+library(ggplot2)
+library(ggspatial)
+library(raster)
+library(sf)
+
+# 设定文件路径
+csv_file <- "D:/4four_year/20241128毕业论文/map/map.csv"
+tiff_file <- "D:/4four_year/20241128毕业论文/map/map.tiff"
+
+# 读取数据
+map_data <- read.csv(csv_file)
+fuzhou <- data.frame(lon = 119.2965, lat = 26.0742)
+
+# 读取并处理 TIFF 底图
+r <- stack(tiff_file)
+
+# 确保栅格数据使用 WGS84 坐标系
+r <- projectRaster(r, crs = CRS("+proj=longlat +datum=WGS84"))
+
+# 获取地图范围
+ext <- extent(r)
+xmin <- ext@xmin
+xmax <- ext@xmax
+ymin <- ext@ymin
+ymax <- ext@ymax
+
+# 创建完整的可视化
+p <- ggplot() +
+  # 添加栅格底图
+  annotation_spatial(data = r) +
+  
+  # 添加连接线
+  geom_curve(data = map_data, 
+             aes(x = 119.2965, y = 26.0742, xend = Longitude, yend = Latitude),
+             curvature = 0.2, 
+             arrow = arrow(length = unit(0.15, "inches")), 
+             color = "blue", 
+             size = 0.5, 
+             alpha = 0.6) +
+  
+  # 添加目标点
+  geom_point(data = map_data, 
+             aes(x = Longitude, y = Latitude), 
+             color = "red", 
+             size = 1.5) +
+  
+  # 添加福州起点
+  geom_point(data = fuzhou, 
+             aes(x = lon, y = lat), 
+             color = "green", 
+             size = 2) +
+  
+  # 添加国家标签
+  geom_text(data = map_data, 
+            aes(x = Longitude, y = Latitude, label = Country_Name), 
+            hjust = -0.2, 
+            vjust = -0.5, 
+            size = 2.5, 
+            angle = 30) +
+  
+  # 设置坐标系统和范围
+  coord_sf(xlim = c(xmin, xmax), 
+           ylim = c(ymin, ymax), 
+           expand = FALSE) +
+  
+  # 添加标题和标签
+  labs(title = "菌草技术传播地图",
+       subtitle = "从福州到全球",
+       x = "经度", 
+       y = "纬度") +
+  
+  # 设置主题
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# 显示图片
+print(p)
+
+# 如果需要保存图片
+ggsave("map_output.png", p, width = 12, height = 8, dpi = 300)
