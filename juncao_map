@@ -33,31 +33,31 @@ p <- ggplot() +
   geom_curve(data = map_data, 
              aes(x = 119.2965, y = 26.0742, xend = Longitude, yend = Latitude),
              curvature = 0.2, 
-             arrow = arrow(length = unit(0.1, "inches")),  # **箭头变小**
-             color = "#90EE90",   # **换成浅绿色**
+             arrow = arrow(length = unit(0.1, "inches")),  
+             color = "#90EE90",   
              size = 0.6, 
              alpha = 0.7) +
   
   # 添加目标点 (红色)
   geom_point(data = map_data, 
              aes(x = Longitude, y = Latitude), 
-             color = "red", 
+             color = "#D8383A", 
              size = 1.5) +
   
   # **福州点换成小五角星**
   geom_point(data = fuzhou, 
              aes(x = lon, y = lat), 
-             color = "red",   # **五角星颜色**
-             shape = 8,        # **五角星**
-             size = 3) +       # **适中大小**
+             color = "red",  
+             shape = 8,        
+             size = 3) +       
   
-  # 添加国家标签
-  geom_text(data = map_data, 
-            aes(x = Longitude, y = Latitude, label = Country_Name), 
-            hjust = -0.2, 
-            vjust = -0.5, 
-            size = 2.5, 
-            angle = 30) +
+  # **移除国家标签**
+  # geom_text(data = map_data, 
+  #          aes(x = Longitude, y = Latitude, label = Country_Name), 
+  #          hjust = -0.2, 
+  #          vjust = -0.5, 
+  #          size = 2.5, 
+  #          angle = 30) +
   
   # 设置坐标系统和范围
   coord_sf(xlim = c(xmin, xmax), 
